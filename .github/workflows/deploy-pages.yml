@@ -1,0 +1,59 @@
+
+name: Deploy Campus Lost and Found
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Extract project
+        run: unzip -q campus-lost-found.zip -d extracted
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: extracted/campus-lost-found/frontend/package.json
+
+      - name: Configure Vite
+        working-directory: extracted/campus-lost-found/frontend
+        run: |
+          sed -i 's|defineConfig({|defineConfig({ base: "/-campus-lost-found/",|' vite.config.js
+          sed -i 's|<BrowserRouter>|<BrowserRouter basename="/-campus-lost-found">|' src/main.jsx
+
+      - name: Install and build
+        working-directory: extracted/campus-lost-found/frontend
+        run: |
+          npm install
+          npm run build
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: extracted/campus-lost-found/frontend/dist
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy
+        id: deployment
+        uses: actions/deploy-pages@v4
+        
